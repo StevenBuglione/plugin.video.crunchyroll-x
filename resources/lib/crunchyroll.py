@@ -27,18 +27,21 @@ from . import api
 from . import view
 from . import model
 from . import controller
+from .addon_settings import AddonSettings
 
 
 def main(argv):
     """Main function for the addon
     """
     args = model.parse(argv)
-
     # inputstream adaptive settings
     if hasattr(args, "mode") and args.mode == "hls":
         is_helper = inputstreamhelper.Helper("hls")
         if is_helper.check_inputstream():
             xbmcaddon.Addon(id="inputstream.adaptive").openSettings()
+            addon_settings = AddonSettings(args)
+            settings_str = str(addon_settings)
+            import web_pdb;web_pdb.set_trace()
         return True
 
     # get account informations
@@ -84,6 +87,9 @@ def main(argv):
         view.add_item(args, {"title": args._addon.getLocalizedString(30062)})
         view.endofdirectory(args)
         args._addon.openSettings()
+        addon_settings = AddonSettings.create_from_args(args)
+        settings_str = str(addon_settings)
+        import web_pdb;web_pdb.set_trace()
         return False
     else:
         # login
@@ -92,6 +98,10 @@ def main(argv):
             xbmcplugin.setContent(int(args._argv[1]), "tvshows")
             check_mode(args)
             api.close(args)
+            addon_settings = AddonSettings.create_from_args(args)
+            settings_str = str(addon_settings)
+            import web_pdb;web_pdb.set_trace()
+            return False
         else:
             # login failed
             xbmc.log("[PLUGIN] %s: Login failed" % args._addonname, xbmc.LOGERROR)

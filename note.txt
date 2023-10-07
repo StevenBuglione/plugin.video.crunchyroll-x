@@ -1,0 +1,9 @@
+settings_str =
+'AddonSettings(
+\n\tusername=stevenbuglione1@gmail.com,
+\n\tpassword=***,
+\n\tsession_id=***,
+\n\tauth_token=***,
+\n\tdevice_id=***,
+\n\taddon_id=plugin.video.crunchyroll,
+\n\taddon_name=Crunchyroll\n)'
