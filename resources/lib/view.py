@@ -89,6 +89,54 @@ def add_item(args, info, isFolder=True, total_items=0, mediatype="video"):
                                 isFolder   = isFolder,
                                 totalItems = total_items)
 
+def add_item_get_url(args, info, isFolder=True, total_items=0, mediatype="video"):
+    """Add item to directory listing.
+    """
+
+    # create list item
+    li = xbmcgui.ListItem(label = info["title"])
+
+    # get infoLabels
+    infoLabels = make_infolabel(args, info)
+
+    # get url
+    u = build_url(args, info)
+
+    if isFolder:
+        # directory
+        infoLabels["mediatype"] = "tvshow"
+        li.setInfo(mediatype, infoLabels)
+    else:
+        # playable video
+        infoLabels["mediatype"] = "episode"
+        li.setInfo(mediatype, infoLabels)
+        li.setProperty("IsPlayable", "true")
+
+        # add context menue
+        cm = []
+        if u"series_id" in u:
+            cm.append((args._addon.getLocalizedString(30045), "Container.Update(%s)" % re.sub(r"(?<=mode=)[^&]*", "series", u)))
+        if u"collection_id" in u:
+            cm.append((args._addon.getLocalizedString(30046), "Container.Update(%s)" % re.sub(r"(?<=mode=)[^&]*", "episodes", u)))
+        if len(cm) > 0:
+            li.addContextMenuItems(cm)
+
+    # set media image
+    li.setArt({"thumb":  info.get("thumb",  "DefaultFolder.png"),
+               "poster": info.get("thumb",  "DefaultFolder.png"),
+               "banner": info.get("thumb",  "DefaultFolder.png"),
+               "fanart": info.get("fanart",  xbmcvfs.translatePath(args._addon.getAddonInfo("fanart"))),
+               "icon":   info.get("thumb",  "DefaultFolder.png")})
+
+    # add item to list
+    xbmcplugin.addDirectoryItem(handle     = int(args._argv[1]),
+                                url        = u,
+                                listitem   = li,
+                                isFolder   = isFolder,
+                                totalItems = total_items)
+
+    return u
+
 
 def quote_value(value, PY2):
     """Quote value depending on python
@@ -117,7 +165,8 @@ def build_url(args, info):
         if value and key in types and not "&" + str(key) + "=" in s:
             s = s + "&" + key + "=" + quote_value(value, args.PY2)
 
-    return args._argv[0] + "?" + s[1:]
+    url = args._argv[0] + "?" + s[1:]
+    return url
 
 
 def make_infolabel(args, info):

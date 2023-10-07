@@ -18,6 +18,9 @@
 import ssl
 import time
 import inputstreamhelper
+
+from .VideoInfo import VideoInfo
+
 try:
     from urllib2 import URLError
 except ImportError:
@@ -213,10 +216,11 @@ def listSeries(args, mode):
         view.endofdirectory(args)
         return False
 
+    item_list = []
     # display media
     for item in req["data"]:
         # add to view
-        view.add_item(args,
+        item_list.append(view.add_item_get_url(args,
                       {"title":       item["name"],
                        "tvshowtitle": item["name"],
                        "series_id":   item["series_id"],
@@ -228,16 +232,16 @@ def listSeries(args, mode):
                        "thumb":       item["portrait_image"]["full_url"],
                        "fanart":      item["landscape_image"]["full_url"],
                        "mode":        "series"},
-                      isFolder=True)
+                      isFolder=True))
 
     # show next page button
     if len(req["data"]) >= 30:
-        view.add_item(args,
+        item_list.append(view.add_item_get_url(args,
                       {"title":  args._addon.getLocalizedString(30044),
                        "offset": int(getattr(args, "offset", 0)) + 30,
                        "search": getattr(args, "search", ""),
                        "mode":   args.mode},
-                      isFolder=True)
+                      isFolder=True))
 
     view.endofdirectory(args)
     return True
@@ -260,15 +264,15 @@ def listFilter(args, mode):
         view.endofdirectory(args)
         return False
 
+    item_list = []
     # display media
     for item in req["data"][mode]:
         # add to view
-        view.add_item(args,
+        item_list.append(item.add_item_get_url(args,
                       {"title":  item["label"],
                        "search": item["tag"],
                        "mode":   args.mode},
-                      isFolder=True)
-
+                      isFolder=True))
     view.endofdirectory(args)
     return True
 
@@ -329,10 +333,11 @@ def viewEpisodes(args):
         view.endofdirectory(args)
         return False
 
+    item_list = []
     # display media
     for item in req["data"]:
         # add to view
-        view.add_item(args,
+        item_list.append(view.add_item_get_url(args,
                       {"title":         item["collection_name"] + " #" + item["episode_number"] + " - " + item["name"],
                        "tvshowtitle":   item["collection_name"],
                        "duration":      item["duration"],
@@ -348,8 +353,15 @@ def viewEpisodes(args):
                        "thumb":         (item["screenshot_image"]["fwidestar_url"] if item["premium_only"] else item["screenshot_image"]["full_url"]) if item["screenshot_image"] else "",
                        "fanart":        args.fanart,
                        "mode":          "videoplay"},
-                      isFolder=False)
+                      isFolder=False))
 
+    list_str = str(item_list[0])
+    video_info = VideoInfo(list_str)
+    video_info_str = str(video_info)
+    plot_str = video_info.plot
+    plot_str_enc = video_info.plot_url_encoded
+    url_video = video_info.to_url()
+    import web_pdb;web_pdb.set_trace()
     # show next page button
     if len(req["data"]) >= 30:
         view.add_item(args,

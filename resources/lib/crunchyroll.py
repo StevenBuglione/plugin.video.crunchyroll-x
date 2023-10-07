@@ -40,8 +40,6 @@ def main(argv):
         if is_helper.check_inputstream():
             xbmcaddon.Addon(id="inputstream.adaptive").openSettings()
             addon_settings = AddonSettings(args)
-            settings_str = str(addon_settings)
-            import web_pdb;web_pdb.set_trace()
         return True
 
     # get account informations
@@ -88,8 +86,6 @@ def main(argv):
         view.endofdirectory(args)
         args._addon.openSettings()
         addon_settings = AddonSettings.create_from_args(args)
-        settings_str = str(addon_settings)
-        import web_pdb;web_pdb.set_trace()
         return False
     else:
         # login
@@ -99,8 +95,6 @@ def main(argv):
             check_mode(args)
             api.close(args)
             addon_settings = AddonSettings.create_from_args(args)
-            settings_str = str(addon_settings)
-            import web_pdb;web_pdb.set_trace()
             return False
         else:
             # login failed
@@ -116,6 +110,7 @@ def check_mode(args):
     """
     if hasattr(args, "mode"):
         mode = args.mode
+
     elif hasattr(args, "id"):
         # call from other plugin
         mode = "videoplay"

@@ -54,3 +54,11 @@ class Args(object):
         for key, value in kwargs.items():
             if value:
                 setattr(self, key, unquote_plus(value[0]))
+
+    def __str__(self) -> str:
+        attributes = vars(self)
+        attr_strs = []
+        for key, value in attributes.items():
+            attr_strs.append(f"\t{key}={value}")
+        attr_str = ",\n".join(attr_strs)
+        return f"Args(\n{attr_str}\n)"
