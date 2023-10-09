@@ -355,14 +355,7 @@ def viewEpisodes(args):
                        "mode":          "videoplay"},
                       isFolder=False))
 
-    list_str = str(item_list[0])
-    video_info = VideoInfo(list_str)
-    video_info_str = str(video_info)
-    plot_str = video_info.plot
-    plot_str_enc = video_info.plot_url_encoded
-    url_video = video_info.to_url()
-    import web_pdb;web_pdb.set_trace()
-    # show next page button
+
     if len(req["data"]) >= 30:
         view.add_item(args,
                       {"title":         args._addon.getLocalizedString(30044),
@@ -378,33 +371,64 @@ def viewEpisodes(args):
 
 
 def startplayback(args):
-    """ plays an episode
+    """ plays an episode test
     """
+
     # api request
-    payload = {"media_id": args.episode_id,
-               "fields":   "media.duration,media.playhead,media.stream_data"}
-    req = api.request(args, "info", payload)
+    payload = {"collection_id": args.collection_id,
+               "limit": 30,
+               "offset": int(getattr(args, "offset", 0)),
+               "fields": "media.name,media.media_id,media.collection_id,media.collection_name,media.description,media.episode_number,media.created,media.series_id, \
+                                     media.screenshot_image,media.premium_only,media.premium_available,media.available,media.premium_available,media.duration,media.playhead"}
+    req = api.request(args, "list_media", payload)
 
     # check for error
     if req["error"]:
-        item = xbmcgui.ListItem(getattr(args, "title", "Title not provided"))
-        xbmcplugin.setResolvedUrl(int(args._argv[1]), False, item)
-        xbmcgui.Dialog().ok(args._addonname, args._addon.getLocalizedString(30064))
+        view.add_item(args, {"title": args._addon.getLocalizedString(30061)})
+        view.endofdirectory(args)
         return False
 
-    # get stream url
-    try:
+    # display media
+    playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
+    playlist_index = 0
+    for item in req["data"]:
+        # add to view
+        episode = view.get_episodes(args,
+                                     {"title": item["collection_name"] + " #" + item["episode_number"] + " - " + item[
+                                         "name"],
+                                      "tvshowtitle": item["collection_name"],
+                                      "duration": item["duration"],
+                                      "playcount": 1 if (100 / (float(item["duration"]) + 1)) * int(
+                                          item["playhead"]) > 90 else 0,
+                                      "episode": item["episode_number"],
+                                      "dbid": item["media_id"],
+                                      "collection_id": args.collection_id,
+                                      "series_id": item["series_id"],
+                                      "plot": item["description"],
+                                      "plotoutline": item["description"],
+                                      "aired": item["created"][:10],
+                                      "premiered": item["created"][:10],
+                                      "thumb": (item["screenshot_image"]["fwidestar_url"] if item["premium_only"] else
+                                                item["screenshot_image"]["full_url"]) if item[
+                                          "screenshot_image"] else "",
+                                      "fanart": args.fanart,
+                                      "mode": "videoplay"},
+                                     isFolder=False)
+
+        episode_info: xbmc.InfoTagVideo = episode.getVideoInfoTag()
+        # api request
+        payload = {"media_id": episode_info.getDbId(),
+                   "fields": "media.duration,media.playhead,media.stream_data"}
+        req = api.request(args, "info", payload)
         url = req["data"]["stream_data"]["streams"][0]["url"]
-    except IndexError:
-        item = xbmcgui.ListItem(getattr(args, "title", "Title not provided"))
-        xbmcplugin.setResolvedUrl(int(args._argv[1]), False, item)
-        xbmcgui.Dialog().ok(args._addonname, args._addon.getLocalizedString(30064))
-        return False
+        episode.setMimeType("application/vnd.apple.mpegurl")
+        episode.setContentLookup(False)
+        episode.setPath(url)
+        playlist.add(url,episode)
+        playlist_index += 1
 
-    # prepare playback
-    item = xbmcgui.ListItem(getattr(args, "title", "Title not provided"), path=url)
-    item.setMimeType("application/vnd.apple.mpegurl")
-    item.setContentLookup(False)
+
+
 
     # inputstream adaptive
     is_helper = inputstreamhelper.Helper("hls")
@@ -412,10 +436,11 @@ def startplayback(args):
         item.setProperty("inputstream", "inputstream.adaptive")
         item.setProperty("inputstream.adaptive.manifest_type", "hls")
         # start playback
-        xbmcplugin.setResolvedUrl(int(args._argv[1]), True, item)
+        player = xbmc.Player()
+        player.play(playlist)
 
         # wait for playback
-        #xbmcgui.Dialog().notification(args._addonname, args._addon.getLocalizedString(30066), xbmcgui.NOTIFICATION_INFO)
+        # xbmcgui.Dialog().notification(args._addonname, args._addon.getLocalizedString(30066), xbmcgui.NOTIFICATION_INFO)
         if waitForPlayback(10):
             # if successful wait more
             xbmc.sleep(3000)
@@ -433,11 +458,11 @@ def startplayback(args):
         player = xbmc.Player()
         if not waitForPlayback(30):
             xbmc.log("[PLUGIN] %s: Timeout reached, video did not start in 30 seconds" % args._addonname, xbmc.LOGERROR)
-            #xbmcgui.Dialog().ok(args._addonname, args._addon.getLocalizedString(30064))
+            # xbmcgui.Dialog().ok(args._addonname, args._addon.getLocalizedString(30064))
             return
 
         # ask if user want to continue playback
-        resume = (100/(float(req["data"]["duration"])+1)) * int(req["data"]["playhead"])
+        resume = (100 / (float(req["data"]["duration"]) + 1)) * int(req["data"]["playhead"])
         if resume >= 5 and resume <= 90:
             player.pause()
             if xbmcgui.Dialog().yesno(args._addonname, args._addon.getLocalizedString(30065) % int(resume)):
@@ -452,7 +477,7 @@ def startplayback(args):
 
                 if url == player.getPlayingFile():
                     # api request
-                    payload = {"event":    "playback_status",
+                    payload = {"event": "playback_status",
                                "media_id": args.episode_id,
                                "playhead": int(player.getTime())}
                     try:

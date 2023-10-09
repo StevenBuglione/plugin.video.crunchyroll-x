@@ -89,7 +89,7 @@ def add_item(args, info, isFolder=True, total_items=0, mediatype="video"):
                                 isFolder   = isFolder,
                                 totalItems = total_items)
 
-def add_item_get_url(args, info, isFolder=True, total_items=0, mediatype="video"):
+def add_item_get_url(args, info, isFolder=True, total_items=0, mediatype="video") -> xbmcgui.ListItem:
     """Add item to directory listing.
     """
 
@@ -135,7 +135,50 @@ def add_item_get_url(args, info, isFolder=True, total_items=0, mediatype="video"
                                 isFolder   = isFolder,
                                 totalItems = total_items)
 
-    return u
+    return li
+
+
+def get_episodes(args, info, isFolder=True, total_items=0, mediatype="video") -> xbmcgui.ListItem:
+    """Add item to directory listing.
+    """
+
+    # create list item
+    li = xbmcgui.ListItem(label = info["title"])
+
+    # get infoLabels
+    infoLabels = make_infolabel(args, info)
+
+    # get url
+    u = build_url(args, info)
+
+    if isFolder:
+        # directory
+        infoLabels["mediatype"] = "tvshow"
+        li.setInfo(mediatype, infoLabels)
+    else:
+        # playable video
+        infoLabels["mediatype"] = "episode"
+        li.setInfo(mediatype, infoLabels)
+        li.setProperty("IsPlayable", "true")
+
+        # add context menue
+        cm = []
+        if u"series_id" in u:
+            cm.append((args._addon.getLocalizedString(30045), "Container.Update(%s)" % re.sub(r"(?<=mode=)[^&]*", "series", u)))
+        if u"collection_id" in u:
+            cm.append((args._addon.getLocalizedString(30046), "Container.Update(%s)" % re.sub(r"(?<=mode=)[^&]*", "episodes", u)))
+        if len(cm) > 0:
+            li.addContextMenuItems(cm)
+
+    # set media image
+    li.setArt({"thumb":  info.get("thumb",  "DefaultFolder.png"),
+               "poster": info.get("thumb",  "DefaultFolder.png"),
+               "banner": info.get("thumb",  "DefaultFolder.png"),
+               "fanart": info.get("fanart",  xbmcvfs.translatePath(args._addon.getAddonInfo("fanart"))),
+               "icon":   info.get("thumb",  "DefaultFolder.png")})
+
+    return li
+
 
 
 def quote_value(value, PY2):
