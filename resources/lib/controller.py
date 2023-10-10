@@ -18,8 +18,9 @@
 import ssl
 import time
 import inputstreamhelper
+import json
 
-from .VideoInfo import VideoInfo
+from .upnext import upnext_signal
 
 try:
     from urllib2 import URLError
@@ -30,8 +31,10 @@ import xbmc
 import xbmcgui
 import xbmcplugin
 
-from . import api
+from . import api, upnext
 from . import view
+
+import AddonSignals
 
 
 def showQueue(args):
@@ -227,32 +230,31 @@ def listSeries(args, mode):
         view.endofdirectory(args)
         return False
 
-    item_list = []
     # display media
     for item in req["data"]:
         # add to view
-        item_list.append(view.add_item_get_url(args,
-                                               {"title": item["name"],
-                                                "tvshowtitle": item["name"],
-                                                "series_id": item["series_id"],
-                                                "plot": item["description"],
-                                                "plotoutline": item["description"],
-                                                "genre": ", ".join(item["genres"]),
-                                                "year": item["year"],
-                                                "studio": item["publisher_name"],
-                                                "thumb": item["portrait_image"]["full_url"],
-                                                "fanart": item["landscape_image"]["full_url"],
-                                                "mode": "series"},
-                                               isFolder=True))
+        view.add_item(args,
+                      {"title": item["name"],
+                       "tvshowtitle": item["name"],
+                       "series_id": item["series_id"],
+                       "plot": item["description"],
+                       "plotoutline": item["description"],
+                       "genre": ", ".join(item["genres"]),
+                       "year": item["year"],
+                       "studio": item["publisher_name"],
+                       "thumb": item["portrait_image"]["full_url"],
+                       "fanart": item["landscape_image"]["full_url"],
+                       "mode": "series"},
+                      isFolder=True)
 
     # show next page button
     if len(req["data"]) >= 30:
-        item_list.append(view.add_item_get_url(args,
-                                               {"title": args._addon.getLocalizedString(30044),
-                                                "offset": int(getattr(args, "offset", 0)) + 30,
-                                                "search": getattr(args, "search", ""),
-                                                "mode": args.mode},
-                                               isFolder=True))
+        view.add_item(args,
+                      {"title": args._addon.getLocalizedString(30044),
+                       "offset": int(getattr(args, "offset", 0)) + 30,
+                       "search": getattr(args, "search", ""),
+                       "mode": args.mode},
+                      isFolder=True)
 
     view.endofdirectory(args)
     return True
@@ -275,15 +277,15 @@ def listFilter(args, mode):
         view.endofdirectory(args)
         return False
 
-    item_list = []
     # display media
     for item in req["data"][mode]:
         # add to view
-        item_list.append(item.add_item_get_url(args,
-                                               {"title": item["label"],
-                                                "search": item["tag"],
-                                                "mode": args.mode},
-                                               isFolder=True))
+        view.add_item(args,
+                      {"title": item["label"],
+                       "search": item["tag"],
+                       "mode": args.mode},
+                      isFolder=True)
+
     view.endofdirectory(args)
     return True
 
@@ -344,32 +346,29 @@ def viewEpisodes(args):
         view.endofdirectory(args)
         return False
 
-    item_list = []
     # display media
     for item in req["data"]:
         # add to view
-        item_list.append(view.add_item_get_url(args,
-                                               {"title": item["collection_name"] + " #" + item[
-                                                   "episode_number"] + " - " + item["name"],
-                                                "tvshowtitle": item["collection_name"],
-                                                "duration": item["duration"],
-                                                "playcount": 1 if (100 / (float(item["duration"]) + 1)) * int(
-                                                    item["playhead"]) > 90 else 0,
-                                                "episode": item["episode_number"],
-                                                "episode_id": item["media_id"],
-                                                "collection_id": args.collection_id,
-                                                "series_id": item["series_id"],
-                                                "plot": item["description"],
-                                                "plotoutline": item["description"],
-                                                "aired": item["created"][:10],
-                                                "premiered": item["created"][:10],
-                                                "thumb": (item["screenshot_image"]["fwidestar_url"] if item[
-                                                    "premium_only"] else item["screenshot_image"]["full_url"]) if item[
-                                                    "screenshot_image"] else "",
-                                                "fanart": args.fanart,
-                                                "mode": "videoplay"},
-                                               isFolder=False))
+        view.add_item(args,
+                      {"title": item["collection_name"] + " #" + item["episode_number"] + " - " + item["name"],
+                       "tvshowtitle": item["collection_name"],
+                       "duration": item["duration"],
+                       "playcount": 1 if (100 / (float(item["duration"]) + 1)) * int(item["playhead"]) > 90 else 0,
+                       "episode": item["episode_number"],
+                       "episode_id": item["media_id"],
+                       "collection_id": args.collection_id,
+                       "series_id": item["series_id"],
+                       "plot": item["description"],
+                       "plotoutline": item["description"],
+                       "aired": item["created"][:10],
+                       "premiered": item["created"][:10],
+                       "thumb": (item["screenshot_image"]["fwidestar_url"] if item["premium_only"] else
+                                 item["screenshot_image"]["full_url"]) if item["screenshot_image"] else "",
+                       "fanart": args.fanart,
+                       "mode": "videoplay"},
+                      isFolder=False)
 
+    # show next page button
     if len(req["data"]) >= 30:
         view.add_item(args,
                       {"title": args._addon.getLocalizedString(30044),
@@ -384,16 +383,15 @@ def viewEpisodes(args):
     return True
 
 
-def startplayback(args):
-    """ plays an episode test
+def get_episode_list(args):
+    """ view all episodes of season
     """
-
     # api request
     payload = {"collection_id": args.collection_id,
                "limit": 30,
                "offset": int(getattr(args, "offset", 0)),
                "fields": "media.name,media.media_id,media.collection_id,media.collection_name,media.description,media.episode_number,media.created,media.series_id, \
-                                     media.screenshot_image,media.premium_only,media.premium_available,media.available,media.premium_available,media.duration,media.playhead"}
+                                 media.screenshot_image,media.premium_only,media.premium_available,media.available,media.premium_available,media.duration,media.playhead"}
     req = api.request(args, "list_media", payload)
 
     # check for error
@@ -402,65 +400,104 @@ def startplayback(args):
         view.endofdirectory(args)
         return False
 
+    video_info_list = []
     # display media
-    playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
-    playlist.clear()  # Clear existing items in the playlist
-    player = xbmc.Player()
-    playlist_index = 0
     for item in req["data"]:
         # add to view
-        try:
-            episode = view.get_episodes(args,
-                                        {"title": item["collection_name"] + " #" + item["episode_number"] + " - " +
-                                                  item[
-                                                      "name"],
-                                         "tvshowtitle": item["collection_name"],
-                                         "duration": item["duration"],
-                                         "playcount": 1 if (100 / (float(item["duration"]) + 1)) * int(
-                                             item["playhead"]) > 90 else 0,
-                                         "episode": item["episode_number"],
-                                         "dbid": item["media_id"],
-                                         "collection_id": args.collection_id,
-                                         "series_id": item["series_id"],
-                                         "plot": item["description"],
-                                         "plotoutline": item["description"],
-                                         "aired": item["created"][:10],
-                                         "premiered": item["created"][:10],
-                                         "thumb": (
-                                             item["screenshot_image"]["fwidestar_url"] if item["premium_only"] else
-                                             item["screenshot_image"]["full_url"]) if item[
-                                             "screenshot_image"] else "",
-                                         "fanart": args.fanart,
-                                         "mode": "videoplay"},
-                                        isFolder=False)
+        video_info_list.append(view.get_video_info(args,
+                                              {"title": item["collection_name"] + " #" + item[
+                                                  "episode_number"] + " - " + item["name"],
+                                               "tvshowtitle": item["collection_name"],
+                                               "duration": item["duration"],
+                                               "playcount": 1 if (100 / (float(item["duration"]) + 1)) * int(
+                                                   item["playhead"]) > 90 else 0,
+                                               "episode": item["episode_number"],
+                                               "dbid": item["media_id"],
+                                               "collection_id": args.collection_id,
+                                               "series_id": item["series_id"],
+                                               "plot": item["description"],
+                                               "plotoutline": item["description"],
+                                               "aired": item["created"][:10],
+                                               "premiered": item["created"][:10],
+                                               "thumb": (item["screenshot_image"]["fwidestar_url"] if item[
+                                                   "premium_only"] else item["screenshot_image"]["full_url"]) if item[
+                                                   "screenshot_image"] else "",
+                                               "fanart": args.fanart,
+                                               "mode": "videoplay"},
+                                              isFolder=False))
 
-            episode_info: xbmc.InfoTagVideo = episode.getVideoInfoTag()
-            # api request
-            payload = {"media_id": episode_info.getDbId(),
-                       "fields": "media.duration,media.playhead,media.stream_data"}
-            req = api.request(args, "info", payload)
-            url = req["data"]["stream_data"]["streams"][0]["url"]
-            episode.setMimeType("application/vnd.apple.mpegurl")
-            episode.setContentLookup(False)
-            episode.setPath(url)
-            episode.setProperty("inputstream", "inputstream.adaptive")
-            episode.setProperty("inputstream.adaptive.manifest_type", "hls")
-            playlist.add(url, episode)
-            playlist_index += 1
-        except Exception as e:
-            xbmc.log(f"Error with InputStream Adaptive: {str(e)}", level=xbmc.LOGERROR)
+    return video_info_list
 
-        # Check Inputstream helper and start playback
+
+
+
+
+
+def startplayback(args):
+    """ plays an episode
+    """
+    # api request
+    payload = {"media_id": args.episode_id,
+               "fields": "media.duration,media.playhead,media.stream_data"}
+    req = api.request(args, "info", payload)
+
+    # check for error
+    if req["error"]:
+        item = xbmcgui.ListItem(getattr(args, "title", "Title not provided"))
+        xbmcplugin.setResolvedUrl(int(args._argv[1]), False, item)
+        xbmcgui.Dialog().ok(args._addonname, args._addon.getLocalizedString(30064))
+        return False
+
+    # get stream url
+    try:
+        url = req["data"]["stream_data"]["streams"][0]["url"]
+    except IndexError:
+        item = xbmcgui.ListItem(getattr(args, "title", "Title not provided"))
+        xbmcplugin.setResolvedUrl(int(args._argv[1]), False, item)
+        xbmcgui.Dialog().ok(args._addonname, args._addon.getLocalizedString(30064))
+        return False
+
+    # prepare playback
+    item = xbmcgui.ListItem(getattr(args, "title", "Title not provided"), path=url)
+    item.setMimeType("application/vnd.apple.mpegurl")
+    item.setContentLookup(False)
+
+    # inputstream adaptive
     is_helper = inputstreamhelper.Helper("hls")
+
+    episode_list = get_episode_list(args)
     if is_helper.check_inputstream():
-        player.play(playlist)  # Start playback of the playlist
+        item.setProperty("inputstream", "inputstream.adaptive")
+        item.setProperty("inputstream.adaptive.manifest_type", "hls")
+        # start playback
+        xbmcplugin.setResolvedUrl(int(args._argv[1]), True, item)
+        # Find the index of the current episode in the list
+        current_episode_index = 1
+
+        current_episode = episode_list[0].get_list_item()
+        next_episode = episode_list[1].get_list_item()
+        next_url = episode_list[1].get_url()
+        next_info_data = upnext.get_next_info(current_episode,next_episode,next_url)
+        upnext_signal('plugin.video.crunchyroll_play_action',next_info_data)
+        AddonSignals.registerSlot('upnextprovider', 'plugin.video.crunchyroll_play_action', startplayback)
+
+        # wait for playback
+        # xbmcgui.Dialog().notification(args._addonname, args._addon.getLocalizedString(30066), xbmcgui.NOTIFICATION_INFO)
         if waitForPlayback(10):
             # if successful wait more
             xbmc.sleep(3000)
 
+    # start fallback
+    if not waitForPlayback(2):
+        # start without inputstream adaptive
+        xbmc.log("[PLUGIN] %s: Inputstream Adaptive failed, trying directly with kodi" % args._addonname, xbmc.LOGDEBUG)
+        item.setProperty("inputstream", "")
+        xbmc.Player().play(url, item)
+
     # sync playtime with crunchyroll
     if args._addon.getSetting("sync_playtime") == "true":
         # wait for video to begin
+        player = xbmc.Player()
         if not waitForPlayback(30):
             xbmc.log("[PLUGIN] %s: Timeout reached, video did not start in 30 seconds" % args._addonname, xbmc.LOGERROR)
             # xbmcgui.Dialog().ok(args._addonname, args._addon.getLocalizedString(30064))
@@ -493,6 +530,12 @@ def startplayback(args):
         except RuntimeError:
             xbmc.log("[PLUGIN] %s: Playback aborted" % args._addonname, xbmc.LOGDEBUG)
 
+
+def startplayback_callback():
+    # Check if the player is still playing
+    if xbmc.Player().isPlaying():
+        # If it is, determine args and call startplayback
+        startplayback(args)
 
 def waitForPlayback(timeout=30):
     """ function that waits for playback

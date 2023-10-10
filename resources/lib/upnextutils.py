@@ -4,7 +4,6 @@ def upnext_signal(sender, next_info):
     """Send a signal to Kodi using JSON RPC"""
     from base64 import b64encode
     from json import dumps
-    from upnextutils import notify, to_unicode
     data = [to_unicode(b64encode(dumps(next_info).encode()))]
     notify(sender=sender + '.SIGNAL', message='upnext_data', data=data)
 

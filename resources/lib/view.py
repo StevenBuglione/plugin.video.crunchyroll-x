@@ -16,6 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import re
+
+from resources.lib.VideoInfo import VideoInfo
+
 try:
     from urllib import quote_plus
 except ImportError:
@@ -138,7 +141,7 @@ def add_item_get_url(args, info, isFolder=True, total_items=0, mediatype="video"
     return li
 
 
-def get_episodes(args, info, isFolder=True, total_items=0, mediatype="video") -> xbmcgui.ListItem:
+def get_video_info(args, info, isFolder=True, total_items=0, mediatype="video") -> VideoInfo:
     """Add item to directory listing.
     """
 
@@ -177,7 +180,7 @@ def get_episodes(args, info, isFolder=True, total_items=0, mediatype="video") ->
                "fanart": info.get("fanart",  xbmcvfs.translatePath(args._addon.getAddonInfo("fanart"))),
                "icon":   info.get("thumb",  "DefaultFolder.png")})
 
-    return li
+    return VideoInfo(u,li)
 
 
 

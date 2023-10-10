@@ -16,6 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import random
+import sys
+
 import inputstreamhelper
 
 import xbmc
@@ -108,6 +110,11 @@ def main(argv):
 def check_mode(args):
     """Run mode-specific functions
     """
+
+    if 'upnext_action=play' in sys.argv[2]:
+        xbmc.log("[PLUGIN] %s: UpNext Triggerd")
+        controller.startplayback(args)
+
     if hasattr(args, "mode"):
         mode = args.mode
 
